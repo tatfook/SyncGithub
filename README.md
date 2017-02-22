@@ -105,4 +105,4 @@ git clone git@git.tatfook.com:npl/FirstApp.git
 ```
 - Screenshot
 
-![20170222160105](/uploads/c7e9c5fd303d1940864f9fa549c1dd2c/20170222160105.jpg)
+![20170222160105](https://cloud.githubusercontent.com/assets/5885941/23205842/50cbc52a-f926-11e6-9bc1-f423d41fa477.jpg)
