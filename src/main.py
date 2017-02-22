@@ -1,28 +1,11 @@
-## SyncGithub
-Synchronizing sources from github.com to git.tatfook.com.
-We use [CI:Sync-From-Github-To-Tatfook](http://ci.paraengine.com/job/Sync-From-Github-To-Tatfook/) to invoke this project.
-### CI Command
-```
-python SyncGithub/src/main.py
-```
-### How to use CI to sync a new project
-- Create a new project on [github](https://github.com/NPLPackages), for example "MyProject".
-- Create a same name project on [git.tatfook.com](https://git.tatfook.com:8443/npl), for example "MyProject".
-- Checkout [SyncGithub](https://git.tatfook.com:8443/npl/SyncGithub) and edit main.py and
-- insert a new line of ["MyProject","https://github.com/NPLPackages/MyProject.git","https://git.tatfook.com:8443/npl/MyProject.git"] to the array of depots.
-- Commit your changed
-- Run [CI:Sync-From-Github-To-Tatfook](http://ci.paraengine.com/job/Sync-From-Github-To-Tatfook/)
-
-### Internal Logics
-- Pull the project from github.com to the folder of "from_source" where are source projects.
-- Pull the project from git.tatfook.com to the folder of "to_source" where are destination projects.
-- Copy all files from "from_source/*" to "to_source/*" except "from_source/*/.git".
-- Push projects under the folder of "to_source".
-- Note: One project which can be synchronized should existed on github.com and git.tatfook.com.
-
-### Config
-We can change the values in [main.py](https://git.tatfook.com:8443/npl/SyncGithub/blob/master/src/main.py) to control which depot can be synchronized.
-```python
+#coding=utf-8
+import glob
+import os
+import string
+import shutil
+source_root = "from_source"
+dest_root = "to_source"
+init_depots_root = "init_depots"
 depots = [
 	# depots in NPLPackages
 	# Project name			Source depot													Dest depot
@@ -63,46 +46,100 @@ depots = [
 	["NPLRuntime",			"https://github.com/LiXizhi/NPLRuntime.git",					"git@git.tatfook.com:npl/NPLRuntime.git"],
 	
 ]
-```
-
-### Git global config on linux /etc/gitconfig
-```
-[http]
-    sslVerify = false
-[user]
-    email = yourname@***.com
-    name = yourname
-
-```
-### How to use ssh to pull/push a repository on linux
-- Generating a new SSH key pair [[help]](https://help.github.com/articles/connecting-to-github-with-ssh/)
-- Copy the private file of "git.tatfook.priviate.key" to ~/.ssh/
-- Copy the text from the public file of "git.tatfook.priviate.key.pub" to your account under github.com/git.tatfook.com
-- Adding below text to /etc/ssh/ssh_config, [Where is ssh config](https://linux.die.net/man/5/ssh_config)
-```
-Host git.tatfook.com
-RSAAuthentication yes
-IdentityFile ~/.ssh/git.tatfook.priviate.key
- ```
-- Run git
-```
-git clone git@git.tatfook.com:npl/FirstApp.git
-```
-
-### How to use ssh to pull/push a repository on windows
-- Generating a new SSH key pair [[help]](https://help.github.com/articles/connecting-to-github-with-ssh/)
-- Copy the private file of "git.tatfook.priviate.key" to ~/.ssh/
-- Copy the text from the public file of "git.tatfook.priviate.key.pub" to your account under github.com/git.tatfook.com
-- Adding below text to [Git installed folder]/etc/ssh/ssh_config, [Where is ssh config](https://linux.die.net/man/5/ssh_config)
-```
-Host git.tatfook.com
-RSAAuthentication yes
-IdentityFile ~/.ssh/git.tatfook.priviate.key
- ```
-- Run git
-```
-git clone git@git.tatfook.com:npl/FirstApp.git
-```
-- Screenshot
-
-![20170222160105](/uploads/c7e9c5fd303d1940864f9fa549c1dd2c/20170222160105.jpg)
+def gitPull():
+	print "gitPull-------------------------->"
+	# Create source folder
+	if not os.path.exists(source_root):
+		os.makedirs(source_root)
+	# Create destination folder
+	if not os.path.exists(dest_root):
+		os.makedirs(dest_root)
+	for line in depots:
+		depot_name = line[0]
+		src_git = line[1]
+		dest_git = line[2]
+		gitPullOne(depot_name,src_git,source_root)
+		gitPullOne(depot_name,dest_git,dest_root)
+def gitPullOne(depot_name,git_url,root):
+	print "gitPullOne-------------------------->"
+	print git_url
+	result = os.system("git ls-remote %s" % git_url)
+	if result != 0:
+		print "[Warning]:can't visit %s" % git_url
+		return
+	os.chdir("%s" % root)
+	if os.path.isfile(depot_name + "/README.md"):
+		os.chdir(depot_name)
+		os.system("git reset --hard" )
+		os.system("git pull" )
+		os.chdir("..")
+	else:
+		os.system("git clone %s" % (git_url))
+	os.chdir("..")
+def gitPush():
+	print "gitPush-------------------------->"
+	for line in depots:
+		depot_name = line[0]
+		print line[2]
+		os.chdir("%s/%s" % (dest_root,depot_name))
+		os.system("git add ." )
+		os.system("git commit -m'autosync'")
+		os.system("git push")
+		os.chdir("../..")
+def getProjects(directory):
+	"""
+	Get project name.
+	"""
+	if os.path.exists(directory):
+		for root, dirnames, filenames in os.walk(directory):
+			return dirnames
+def searchFiles(directory):
+	"""
+	Search a directory and return all its names of file except the directory of ".git"
+	"""
+	ignore_folder = directory + "/.git"
+	matches = []
+	if os.path.exists(directory):
+		for root, dirnames, filenames in os.walk(directory):
+			root = string.replace(root,"\\","/")
+			if not bool(ignore_folder in root):
+				for name in filenames:
+					r = os.path.join(root, name)
+					r = string.replace(r,"\\","/")
+					matches.append(r)
+	return matches
+def cloneFiles(source_folder,dest_folder):
+	"""
+	Clone files
+	"""
+	print "cloneFiles-------------------------->"
+	print "source_folder: %s" % source_folder
+	print "dest_folder: %s" % dest_folder
+	
+	source_files = searchFiles(source_folder)
+	dest_files = searchFiles(dest_folder)
+	
+	# Copy files
+	for name in source_files:
+		source_path = name
+		dest_path = name.replace(source_root,dest_root)
+		if os.path.exists(source_path):
+			print "copy %s -> %s" % (source_path, dest_path)
+			dir = os.path.dirname(dest_path)
+			if not os.path.exists(dir):
+				os.makedirs(dir)
+			shutil.copy(source_path,dest_path)
+def cloneAll():
+	for line in depots:
+		name = line[0]
+		source_folder = source_root + "/" + name
+		dest_folder = dest_root + "/" + name
+		# Check destination folder
+		if os.path.exists(dest_folder):
+			cloneFiles(source_folder,dest_folder)
+def main():
+	gitPull()
+	cloneAll()
+	gitPush()
+if __name__ == "__main__":
+    main()

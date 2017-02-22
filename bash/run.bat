@@ -1,0 +1,1 @@
+python SyncGithub\src\main.py 
